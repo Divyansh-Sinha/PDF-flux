@@ -25,9 +25,10 @@ def insert_rows(payload: InsertRequest) -> InsertResponse:
 
     engine = create_db_engine(conn.url)
     metadata = MetaData()
+    schema = "public" if conn.db_type == "postgresql+psycopg" else None
 
     try:
-        table = Table(payload.table, metadata, autoload_with=engine, schema="public")
+        table = Table(payload.table, metadata, autoload_with=engine, schema=schema)
     except Exception as exc:
         engine.dispose()
         raise HTTPException(status_code=400, detail=f"Unable to load table '{payload.table}': {exc}") from exc

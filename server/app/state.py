@@ -9,6 +9,7 @@ from typing import Any
 class DBConnectionConfig:
     connection_id: str
     url: str
+    db_type: str
 
 
 @dataclass
