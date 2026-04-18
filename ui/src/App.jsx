@@ -50,7 +50,8 @@ export default function App() {
     connected: false,
     connectionId: "",
     tables: [],
-    label: "No Database"
+    label: "No Database",
+    type: ""
   });
   const [pdfState, setPdfState] = useState({
     localName: "",
@@ -146,7 +147,7 @@ export default function App() {
       user: formValues.user,
       password: formValues.password,
       dbname: formValues.dbname,
-      type: "postgresql"
+      type: formValues.type || "postgresql"
     };
     const result = await connectDb(payload);
     const firstTable = result.tables?.[0]?.name || "";
@@ -154,7 +155,8 @@ export default function App() {
       connected: true,
       connectionId: result.connectionId,
       tables: result.tables || [],
-      label: formValues.dbname
+      label: formValues.dbname,
+      type: payload.type
     });
     if (firstTable) {
       applyTableSelection(firstTable, result.tables || []);
@@ -204,7 +206,7 @@ export default function App() {
     setInsertResult(null);
     setUsageStats(null);
     if (!dbState.connectionId) {
-      setExtractError("Connect a PostgreSQL database first.");
+      setExtractError("Connect a PostgreSQL or MySQL database first.");
       setShowDbModal(true);
       return;
     }
@@ -447,6 +449,7 @@ export default function App() {
       {showDbModal ? (
         <ConnectDbModal
           onClose={() => setShowDbModal(false)}
+          activeDbLabel={dbState.connected ? `${dbState.label} (${(dbState.type || "postgresql").toUpperCase()})` : ""}
           onSave={async (formValues) => {
             const result = await handleDbConnect(formValues);
             return result;

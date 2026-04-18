@@ -1,8 +1,18 @@
 import { Database, Loader2, X, CheckCircle2, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
-const DB_TYPES = ["PostgreSQL", "MySQL", "SQLite", "MSSQL"];
-const INITIAL_FORM = { host: "localhost", port: "5432", dbname: "my_database", user: "postgres", password: "" };
+const DB_TYPES = [
+  { id: "postgresql", label: "PostgreSQL", defaultPort: "5432", defaultUser: "postgres" },
+  { id: "mysql", label: "MySQL", defaultPort: "3306", defaultUser: "root" }
+];
+const INITIAL_FORM = {
+  type: "postgresql",
+  host: "localhost",
+  port: "5432",
+  dbname: "my_database",
+  user: "postgres",
+  password: ""
+};
 const STORAGE_KEY = "saved_db_connections";
 
 function loadSaved() {
@@ -11,9 +21,10 @@ function loadSaved() {
 
 function saveToPersist(form) {
   const list = loadSaved();
-  const key = `${form.host}:${form.port}/${form.dbname}`;
-  const existing = list.findIndex(c => `${c.host}:${c.port}/${c.dbname}` === key);
-  const entry = { ...form, id: key, savedAt: new Date().toISOString() };
+  const normalizedForm = { ...INITIAL_FORM, ...form };
+  const key = `${normalizedForm.type}:${normalizedForm.host}:${normalizedForm.port}/${normalizedForm.dbname}`;
+  const existing = list.findIndex((connection) => `${connection.type}:${connection.host}:${connection.port}/${connection.dbname}` === key);
+  const entry = { ...normalizedForm, id: key, savedAt: new Date().toISOString() };
   if (existing >= 0) list[existing] = entry; else list.unshift(entry);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 10)));
 }
@@ -28,12 +39,25 @@ export function ConnectDbModal({ onClose, onSave, onTest, activeDbLabel }) {
 
   useEffect(() => { setSavedConns(loadSaved()); }, []);
 
-  async function submit(action) {
+  function handleTypeSelect(typeId) {
+    const selectedType = DB_TYPES.find((item) => item.id === typeId);
+    if (!selectedType) return;
+
+    setForm((prev) => ({
+      ...prev,
+      type: selectedType.id,
+      port: selectedType.defaultPort,
+      user: selectedType.defaultUser
+    }));
+  }
+
+  async function submit(action, nextForm = form) {
     setLoading(true); setError(""); setStatus("");
     try {
-      const result = await action(form);
+      const result = await action(nextForm);
+      setForm(nextForm);
       setStatus(`Connected — ${(result.tables || []).length} tables found`);
-      saveToPersist(form);
+      saveToPersist(nextForm);
       setSavedConns(loadSaved());
       return result;
     } catch (err) {
@@ -75,10 +99,23 @@ export function ConnectDbModal({ onClose, onSave, onTest, activeDbLabel }) {
               <div key={c.id} style={{ border: "1px solid #2a3347", borderRadius: "10px", padding: "10px 12px", background: "#0d1120", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
                 <div>
                   <strong style={{ fontSize: "13px" }}>{c.dbname}</strong>
+                  <span style={{ display: "block", fontSize: "11px", color: "#3dd7b1", marginTop: "2px" }}>
+                    {(c.type || "postgresql").toUpperCase()}
+                  </span>
                   <span style={{ display: "block", fontSize: "11px", color: "#7a85a0", marginTop: "2px" }}>{c.user}@{c.host}:{c.port}</span>
                 </div>
                 <div style={{ display: "flex", gap: "6px" }}>
-                  <button className="ghost-btn compact" onClick={async () => { setForm(c); setTab("new"); const r = await submit(onSave); if (r) onClose(); }} disabled={loading}>
+                  <button
+                    className="ghost-btn compact"
+                    onClick={async () => {
+                      const nextForm = { ...INITIAL_FORM, ...c };
+                      setForm(nextForm);
+                      setTab("new");
+                      const r = await submit(onSave, nextForm);
+                      if (r) onClose();
+                    }}
+                    disabled={loading}
+                  >
                     <CheckCircle2 size={13} /> Connect
                   </button>
                   <button className="icon-btn" onClick={() => deleteConn(c.id)} title="Remove"><Trash2 size={13} /></button>
@@ -92,9 +129,14 @@ export function ConnectDbModal({ onClose, onSave, onTest, activeDbLabel }) {
           <>
             <label className="field-label">DATABASE TYPE</label>
             <div className="db-type-grid">
-              {DB_TYPES.map((type, index) => (
-                <button key={type} className={`db-type ${index === 0 ? "active" : ""}`} type="button" disabled={index !== 0}>
-                  <Database size={14} />{type}
+              {DB_TYPES.map((type) => (
+                <button
+                  key={type.id}
+                  className={`db-type ${form.type === type.id ? "active" : ""}`}
+                  type="button"
+                  onClick={() => handleTypeSelect(type.id)}
+                >
+                  <Database size={14} />{type.label}
                 </button>
               ))}
             </div>
